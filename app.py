@@ -1,62 +1,22 @@
-from flask import Flask, render_template, request
-import sqlite3, os
+from flask import Flask, request
+from sqlalchemy import create_engine, text
 
 app = Flask(__name__)
 
-# ---------------------- DATABASE SETUP ----------------------
-if not os.path.exists("messages.db"):
-    conn = sqlite3.connect("messages.db")
-    cursor = conn.cursor()
-    cursor.execute("""
-    CREATE TABLE messages(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT,
-        email TEXT,
-        message TEXT
-    )
-    """)
-    conn.commit()
-    conn.close()
+DATABASE_URL = "postgresql://neondb_owner:npg_cY82DrTyNlRQ@ep-divine-leaf-adasmt6m-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require"
 
+engine = create_engine(DATABASE_URL)
 
-# ---------------------- ROUTES ----------------------
-@app.route("/")
-def index():
-    return render_template("index.html")
-
-
-@app.route("/contact")
-def contact_page():
-    return render_template("contact.html")
-
-
-@app.route("/contact", methods=["POST"])
-def contact_submit():
+@app.route('/contact', methods=['POST'])
+def contact():
     name = request.form.get("name")
     email = request.form.get("email")
     message = request.form.get("message")
 
-    conn = sqlite3.connect("messages.db")
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO messages (name, email, message) VALUES (?, ?, ?)",
-                   (name, email, message))
-    conn.commit()
-    conn.close()
+    with engine.connect() as conn:
+        conn.execute(
+            text("INSERT INTO messages (name, email, message) VALUES (:name, :email, :message)"),
+            {"name": name, "email": email, "message": message}
+        )
 
-    return "Message sent successfully!"
-
-
-@app.route("/messages")
-def view_messages():
-    conn = sqlite3.connect("messages.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM messages")
-    data = cursor.fetchall()
-    conn.close()
-
-    return render_template("messages.html", messages=data)
-
-
-# ---------------------- RUN ----------------------
-if __name__ == "__main__":
-    app.run(debug=True)
+    return "Message sent!"
